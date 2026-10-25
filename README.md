@@ -29,6 +29,12 @@ python -m http.server 8000
 
 y abrí http://localhost:8000/.
 
+## En vivo en YouTube
+
+`stream/` tiene un contenedor que transmite la radio 24/7 a YouTube Live desde un servidor (por ejemplo, Oracle Cloud Always Free). Pasos en [stream/README.md](stream/README.md).
+
+La página tiene un modo para eso: `?vivo` arranca sola, sin botones, y rota de estación cada 12 a 20 minutos.
+
 ## Licencia
 
 AGPL-3.0, igual que Strudel.

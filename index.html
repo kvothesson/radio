@@ -88,6 +88,15 @@ footer { display: grid; gap: 10px; }
 }
 #stop[hidden] { display: none; }
 a { color: var(--muted); }
+/* Modo vivo (?vivo): lo que se transmite a YouTube. Sin botones, con cartel de vivo y dirección. */
+.envivo, .row .sitio { display: none; }
+.vivo .envivo { display: inline-flex; align-items: center; gap: 8px; margin-left: 14px; vertical-align: middle;
+  font: 600 12px/1 var(--mono); letter-spacing: .16em; color: var(--amber); border: 1px solid var(--amber); border-radius: 999px; padding: 6px 10px; text-shadow: none; }
+.vivo .envivo::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #ff5a6e; animation: late 1.6s infinite; }
+@keyframes late { 50% { opacity: .25; } }
+.vivo #play, .vivo #stop, .vivo .row .credito { display: none; }
+.vivo .row .sitio { display: inline; color: var(--fg); letter-spacing: .08em; }
+.vivo .dial button { pointer-events: none; }
 @media (max-width: 560px) {
   .dial { grid-template-columns: 1fr; gap: 6px; }
   .dial button { min-height: 0; padding: 8px 12px; }
@@ -100,7 +109,7 @@ a { color: var(--muted); }
 <div class="scan" aria-hidden="true"></div>
 <div class="ui">
   <header>
-    <h1>RADIO AUSTRAL</h1>
+    <h1>RADIO AUSTRAL<span class="envivo">EN VIVO</span></h1>
     <p>El frío computa, el calor recuerda. Transmisión generativa, nunca suena igual dos veces.</p>
     <div class="hud" id="hud" aria-live="polite">Señal en espera. Tocá sintonizar.</div>
   </header>
@@ -112,7 +121,8 @@ a { color: var(--muted); }
       <button type="button" data-st="glaciar" data-heat="cold" aria-pressed="false"><b>03 · GLACIAR</b><span>Folklore electrónico · Cerebro Austral</span></button>
     </nav>
     <div class="row">
-      <span>Sintetizado en tu navegador con <a href="https://strudel.cc" rel="noopener">Strudel</a>. Un proyecto de <a href="https://kvothesson.com/">Kvothesson</a>.</span>
+      <span class="credito">Sintetizado en tu navegador con <a href="https://strudel.cc" rel="noopener">Strudel</a>. Un proyecto de <a href="https://kvothesson.com/">Kvothesson</a>.</span>
+      <span class="sitio">kvothesson.com/radio · compuesta en vivo con Strudel, nunca suena igual dos veces</span>
       <button id="stop" type="button" hidden>■ Cortar</button>
     </div>
   </footer>
@@ -533,6 +543,21 @@ document.querySelectorAll('.dial button').forEach(b => b.addEventListener('click
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden && playing) getAudioContext().resume();
 });
+
+// ---------- Modo vivo: la transmisión 24/7 (el navegador del servidor arranca sin gesto) ----------
+if (new URLSearchParams(location.search).has('vivo')) {
+  document.body.classList.add('vivo');
+  // superdough se inicializa con el primer mousedown del documento
+  document.dispatchEvent(new MouseEvent('mousedown'));
+  playBtn.click();
+  // cambia de estación cada 12 a 20 minutos, nunca a la misma
+  const rotar = () => setTimeout(() => {
+    const otras = Object.keys(STATIONS).filter(k => k !== stationKey);
+    if (playing) startStation(otras[Math.floor(Math.random() * otras.length)]);
+    rotar();
+  }, (12 + Math.random() * 8) * 60000);
+  rotar();
+}
 
 // ---------- Visual ----------
 const cv = document.getElementById('cv');
