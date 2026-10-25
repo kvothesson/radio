@@ -1,0 +1,664 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://kvothesson.com/radio/">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Radio Austral">
+<meta property="og:description" content="Música generativa infinita del Universo Austral: cumbia glitch, milonga cyberpunk y folklore electrónico. Nunca suena igual dos veces.">
+<meta property="og:url" content="https://kvothesson.com/radio/">
+<meta property="og:locale" content="es_AR">
+<meta name="theme-color" content="#04080d">
+<title>Radio Austral</title>
+<meta name="description" content="Música generativa infinita del Universo Austral: cumbia glitch, milonga cyberpunk y folklore electrónico, hecha con Strudel en tu navegador. Nunca suena igual dos veces.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Radio de noche: siempre oscura. Frío (hielo) computa, calor (ámbar) recuerda. */
+:root {
+  --bg: #04080d;
+  --fg: #d8f3ff;
+  --muted: #6f8fa3;
+  --line: #16303f;
+  --ice: #5ce1ff;
+  --amber: #ffb347;
+  --display: "Bricolage Grotesque", "Arial Narrow", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font: 14px/1.45 var(--mono);
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+}
+canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+.scan {
+  position: fixed; inset: 0; pointer-events: none;
+  background: repeating-linear-gradient(0deg, rgba(0,0,0,.22) 0 1px, transparent 1px 3px);
+  mix-blend-mode: multiply;
+}
+.ui {
+  position: fixed; inset: 0;
+  display: flex; flex-direction: column; justify-content: space-between;
+  padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  pointer-events: none;
+}
+.ui > * { pointer-events: auto; }
+header h1 {
+  margin: 0; font: 800 clamp(26px, 6vw, 44px)/1 var(--display); letter-spacing: .02em;
+  text-shadow: 2px 0 rgba(255,179,71,.55), -2px 0 rgba(92,225,255,.55);
+}
+header p { margin: 6px 0 0; color: var(--muted); font-size: 12px; }
+.hud { margin-top: 14px; font-size: 12px; color: var(--muted); min-height: 5.8em; }
+.hud b { color: var(--fg); font-weight: 600; }
+.hud .warm { color: var(--amber); }
+.hud .cold { color: var(--ice); }
+.center { display: grid; place-items: center; flex: 1; }
+#play {
+  font: 600 13px/1 var(--mono); letter-spacing: .18em; text-transform: uppercase;
+  color: var(--bg); background: var(--ice); border: 0; border-radius: 999px;
+  padding: 18px 28px; cursor: pointer;
+  box-shadow: 0 0 0 6px rgba(92,225,255,.12), 0 0 40px rgba(92,225,255,.35);
+}
+#play:hover { background: #8beaff; }
+#play:focus-visible, .dial button:focus-visible, #stop:focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; }
+#play[hidden] { display: none; }
+.dial { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.dial button {
+  font: 12px/1.3 var(--mono); text-align: left; color: var(--muted);
+  background: rgba(4,8,13,.72); border: 1px solid var(--line); border-radius: 10px;
+  padding: 10px 12px; cursor: pointer; min-height: 56px;
+}
+.dial button b { display: block; color: var(--fg); font-weight: 600; letter-spacing: .06em; }
+.dial button[aria-pressed="true"] { border-color: var(--ice); color: var(--ice); }
+.dial button[aria-pressed="true"][data-heat="hot"] { border-color: var(--amber); color: var(--amber); }
+footer { display: grid; gap: 10px; }
+.row { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 11px; color: var(--muted); }
+#stop {
+  font: 11px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase;
+  color: var(--muted); background: transparent; border: 1px solid var(--line); border-radius: 999px;
+  padding: 8px 14px; cursor: pointer; white-space: nowrap;
+}
+#stop[hidden] { display: none; }
+a { color: var(--muted); }
+@media (max-width: 560px) {
+  .dial { grid-template-columns: 1fr; gap: 6px; }
+  .dial button { min-height: 0; padding: 8px 12px; }
+  .dial button span { display: none; }
+}
+</style>
+</head>
+<body>
+<canvas id="cv" aria-hidden="true"></canvas>
+<div class="scan" aria-hidden="true"></div>
+<div class="ui">
+  <header>
+    <h1>RADIO AUSTRAL</h1>
+    <p>El frío computa, el calor recuerda. Transmisión generativa, nunca suena igual dos veces.</p>
+    <div class="hud" id="hud" aria-live="polite">Señal en espera. Tocá sintonizar.</div>
+  </header>
+  <div class="center"><button id="play" type="button">▶ Sintonizar</button></div>
+  <footer>
+    <nav class="dial" aria-label="Estaciones">
+      <button type="button" data-st="cumbia" data-heat="hot" aria-pressed="true"><b>01 · FM CALOR 404</b><span>Cumbia glitch · Nodo Corrientes</span></button>
+      <button type="button" data-st="milonga" data-heat="hot" aria-pressed="false"><b>02 · NEO-BA 2074</b><span>Milonga cyberpunk · bajo el Obelisco</span></button>
+      <button type="button" data-st="glaciar" data-heat="cold" aria-pressed="false"><b>03 · GLACIAR</b><span>Folklore electrónico · Cerebro Austral</span></button>
+    </nav>
+    <div class="row">
+      <span>Sintetizado en tu navegador con <a href="https://strudel.cc" rel="noopener">Strudel</a>. Un proyecto de <a href="https://kvothesson.com/">Kvothesson</a>.</span>
+      <button id="stop" type="button" hidden>■ Cortar</button>
+    </div>
+  </footer>
+</div>
+<script src="https://unpkg.com/@strudel/web@1.3.0/dist/index.js"></script>
+<script type="module">
+// ---------- Master: todo lo que Strudel manda al parlante pasa por limitador + saturación suave ----------
+const nativeConnect = AudioNode.prototype.connect;
+const masters = new WeakMap();
+function masterFor(ctx) {
+  let m = masters.get(ctx);
+  if (m) return m;
+  const input = ctx.createGain(); input.gain.value = 0.55;
+  const comp = ctx.createDynamicsCompressor();
+  comp.threshold.value = -14; comp.knee.value = 6; comp.ratio.value = 12;
+  comp.attack.value = 0.003; comp.release.value = 0.25;
+  // tanh nunca pasa de 1: el techo es físico, no estadístico
+  const shaper = ctx.createWaveShaper();
+  const curve = new Float32Array(2048);
+  for (let i = 0; i < curve.length; i++) { const x = (i / (curve.length - 1)) * 2 - 1; curve[i] = Math.tanh(x * 1.6) / Math.tanh(1.6) * 0.92; }
+  shaper.curve = curve;
+  const analyser = ctx.createAnalyser(); analyser.fftSize = 1024; analyser.smoothingTimeConstant = 0.78;
+  nativeConnect.call(input, comp); nativeConnect.call(comp, shaper);
+  const outGain = ctx.createGain(); outGain.gain.value = window.__radioMuted ? 0 : 1; // __radioMuted solo lo usan las pruebas
+  nativeConnect.call(shaper, outGain); nativeConnect.call(outGain, ctx.destination); nativeConnect.call(shaper, analyser);
+  m = { input, analyser, ctx, out: shaper, outGain };
+  masters.set(ctx, m);
+  window.__radioMaster = m;
+  return m;
+}
+AudioNode.prototype.connect = function (dest, ...rest) {
+  // solo el contexto que suena; Strudel usa OfflineAudioContext para fabricar reverbs y eso no se toca
+  if (dest instanceof AudioDestinationNode && !(this.context instanceof OfflineAudioContext)) return nativeConnect.call(this, masterFor(this.context).input, ...rest);
+  return nativeConnect.call(this, dest, ...rest);
+};
+
+const strudelReady = initStrudel({ prebake: () => samples('github:tidalcycles/dirt-samples') });
+
+// ---------- Azar con semilla ----------
+function mulberry(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const masterSeed = crypto.getRandomValues(new Uint32Array(1))[0];
+let R = mulberry(masterSeed);
+const rnd = (a = 0, b = 1) => a + R() * (b - a);
+const chance = p => R() < p;
+const choose = arr => arr[Math.floor(R() * arr.length)];
+const irnd = (a, b) => Math.floor(rnd(a, b + 1));
+
+// ---------- Teoría ----------
+const SCALES = {
+  menor:        { iv: [0,2,3,5,7,8,10], name: 'menor' },
+  dorico:       { iv: [0,2,3,5,7,9,10], name: 'dórico' },
+  frigio:       { iv: [0,1,3,5,7,8,10], name: 'frigio' },
+  armonica:     { iv: [0,2,3,5,7,8,11], name: 'menor armónica' },
+  frigioDom:    { iv: [0,1,4,5,7,8,10], name: 'frigio dominante' },
+  mixolidio:    { iv: [0,2,4,5,7,9,10], name: 'mixolidio' },
+};
+const NOTE_NAMES = ['Do','Do♯','Re','Mi♭','Mi','Fa','Fa♯','Sol','La♭','La','Si♭','Si'];
+const deg = (h, d, oct = 0) => { const L = h.iv.length, q = Math.floor(d / L), r = ((d % L) + L) % L; return h.root + 12 * (q + oct) + h.iv[r]; };
+const triad = (h, d) => [deg(h, d), deg(h, d + 2), deg(h, d + 4)];
+const PENTA = new Set([0, 2, 3, 4, 6]); // grados que dan pentatónica menor dentro de un modo menor
+
+// ---------- Estaciones ----------
+const STATIONS = {
+  cumbia: {
+    label: '01 · FM CALOR 404', heat: 0.85, steps: 16, bpm: [90, 104], beat: 4,
+    scales: ['menor', 'dorico', 'frigioDom', 'armonica'], roots: [57, 59, 60, 62, 64],
+    progs: [[0,6,5,4], [0,3,4,0], [0,5,3,4], [0,3,6,2], [0,6,3,4], [0,4,5,3]],
+    glitch: 0.35,
+  },
+  milonga: {
+    label: '02 · NEO-BA 2074', heat: 0.6, steps: 16, bpm: [104, 124], beat: 4,
+    scales: ['armonica', 'menor', 'frigio'], roots: [55, 57, 59, 62, 64],
+    progs: [[0,3,4,0], [0,6,5,4], [0,5,1,4], [0,3,0,4], [0,2,5,4]],
+    glitch: 0.25,
+  },
+  glaciar: {
+    label: '03 · GLACIAR', heat: 0.15, steps: 12, bpm: [66, 80], beat: 6,
+    scales: ['menor', 'dorico', 'mixolidio'], roots: [57, 59, 62, 64, 66],
+    progs: [[0,6,5,6], [0,3,6,2], [0,5,6,0], [0,2,3,6], [0,4,3,0]],
+    glitch: 0.18,
+  },
+};
+
+const SECTION = 8;       // compases por sección
+const MOVEMENT = 4;      // secciones por movimiento (cambia tonalidad, tempo y timbres)
+
+// ---------- Estado ----------
+let repl = null, stationKey = 'cumbia', playing = false;
+let harmony = null, timbre = null, energy = 0.45, curCps = 0.4;
+
+function newMovement(st) {
+  const sc = SCALES[choose(st.scales)];
+  let root = choose(st.roots);
+  if (harmony && chance(0.6)) { root = harmony.root + choose([5, 7, -5, -7, 2, -2, 3]); while (root < 52) root += 12; while (root > 67) root -= 12; }
+  harmony = { root, iv: sc.iv, name: sc.name, prog: choose(st.progs).slice(), penta: st === STATIONS.glaciar || chance(0.4) };
+  if (chance(0.35)) harmony.prog[irnd(1, 3)] = irnd(1, 6);
+  const bpm = irnd(st.bpm[0], st.bpm[1]);
+  harmony.bpm = bpm;
+  curCps = bpm / 60 / st.beat; // un ciclo = un compás
+  timbre = {
+    lead: choose(st === STATIONS.glaciar ? ['sine', 'triangle', 'triangle'] : ['square', 'sawtooth', 'triangle', 'square']),
+    leadLpf: irnd(1400, 4200), leadFm: chance(0.35) ? rnd(0.5, 2.5) : 0, vib: rnd(3.5, 6.5), vibmod: rnd(0.05, 0.25),
+    pad: choose(st === STATIONS.milonga ? ['supersaw', 'sawtooth'] : st === STATIONS.glaciar ? ['triangle', 'sine', 'supersaw'] : ['sawtooth', 'square', 'triangle']),
+    padLpf: irnd(500, 1600),
+    bass: choose(['sawtooth', 'square', 'sine', 'triangle']), bassLpf: irnd(280, 900),
+    kickN: irnd(0, 8), snareN: irnd(0, 10), hatN: irnd(0, 8), percN: irnd(0, 6),
+    crushBits: choose([4, 5, 6, 8]),
+  };
+}
+
+// ---------- Generadores de compás (devuelven tokens de mini-notación) ----------
+const bar = toks => '[' + toks.join(' ') + ']';
+const cycle8 = bars => '<' + bars.join(' ') + '>';
+
+function drumBars(st, kind, fillBar) {
+  const S = st.steps, bars = [];
+  const templates = {
+    cumbia: {
+      kick: [[0,8], [0,8,14], [0,6,8], [0,8,11]],
+      snare: [[4,12], [4,12,15], [4,10,12]],
+      perc: [[2,6,10,14], [3,7,11,15], [2,7,10,15]],
+    },
+    milonga: {
+      kick: [[0,3,6,8,11,14], [0,3,6,8,11], [0,6,8,14], [0,3,8,11]],
+      snare: [[12], [4,12], [6,14]],
+      perc: [[2,10], [5,13], [3,7,11,15]],
+    },
+    glaciar: { // 6/8: dos compases de seis corcheas en 12 pasos
+      kick: [[0,3,6,9], [0,5,6,11], [0,3,5,6,9,11], [0,6,9]],
+      snare: [[3,9], [5,11], [2,8]],
+      perc: [[1,4,7,10], [2,5,8,11], [1,2,7,8]],
+    },
+  }[stationKey];
+  const base = choose(templates[kind]);
+  for (let b = 0; b < SECTION; b++) {
+    const on = new Set(base);
+    if (chance(0.25)) on.add(irnd(0, S - 1));
+    if (chance(0.15) && on.size > 1) on.delete(choose([...on].filter(x => x !== 0)));
+    const toks = [];
+    for (let i = 0; i < S; i++) {
+      if (b === fillBar && kind === 'snare' && i >= S - 4 && chance(0.7)) { toks.push(chance(0.5) ? '1*2' : '1'); continue; }
+      toks.push(on.has(i) ? '1' : '~');
+    }
+    bars.push(bar(toks));
+  }
+  return cycle8(bars);
+}
+
+function hatGains(st) {
+  const S = st.steps, bars = [];
+  // null = silencio; la güira de cumbia es el chi · chi-chi de a corcheas y semicorcheas
+  const accent = stationKey === 'cumbia' ? [1, null, .55, .7] : stationKey === 'milonga' ? [1, null, .45, null] : [1, .3, .5];
+  for (let b = 0; b < SECTION; b++) {
+    const toks = [];
+    for (let i = 0; i < S; i++) { const a = accent[i % accent.length]; toks.push(a == null || chance(0.04) ? '~' : (a * rnd(0.85, 1.1)).toFixed(2)); }
+    bars.push(bar(toks));
+  }
+  return cycle8(bars);
+}
+
+function chordList() {
+  const out = [];
+  for (let b = 0; b < SECTION; b++) out.push(harmony.prog[Math.floor(b / 2) % harmony.prog.length]);
+  return out;
+}
+
+function padBars(chords) {
+  return cycle8(chords.map(d => {
+    const t = triad(harmony, d).map(x => x - 12);
+    if (chance(0.3)) t.push(deg(harmony, d + 6, -1));
+    return '[' + t.join(',') + ']';
+  }));
+}
+
+function bassBars(st, chords) {
+  const S = st.steps;
+  const shapes = {
+    cumbia: [[[0,0],[6,4],[8,0],[14,4]], [[0,0],[3,0],[8,4],[11,4]], [[0,0],[8,4],[10,0],[14,7]]],
+    milonga: [[[0,0],[3,4],[6,0],[8,0],[11,4],[14,0]], [[0,0],[3,0],[6,4],[8,7],[11,4],[14,2]]],
+    glaciar: [[[0,0],[6,4]], [[0,0],[3,0],[6,4],[9,0]], [[0,0],[5,4],[6,0],[11,4]]],
+  }[stationKey];
+  const shape = choose(shapes);
+  return cycle8(chords.map((d, b) => {
+    const toks = Array(S).fill(null);
+    for (const [step, offs] of shape) {
+      if (b > 0 && chance(0.12)) continue;
+      toks[step] = deg(harmony, d + offs, -2);
+    }
+    if (b % 2 === 1 && chance(0.4)) toks[S - 2] = deg(harmony, (chords[(b + 1) % SECTION] ?? d) - 1, -2); // nota de paso
+    return bar(holdTokens(toks, 2));
+  }));
+}
+
+// convierte un arreglo de notas/nulls en tokens con @duración (legato hasta la siguiente nota)
+function holdTokens(arr, maxHold) {
+  const out = [];
+  for (let i = 0; i < arr.length;) {
+    if (arr[i] == null) { out.push('~'); i++; continue; }
+    let L = 1;
+    while (i + L < arr.length && arr[i + L] == null && L < maxHold) L++;
+    out.push(L > 1 ? `${arr[i]}@${L}` : `${arr[i]}`);
+    i += L;
+  }
+  return out;
+}
+
+function leadBars(st, chords) {
+  const S = st.steps;
+  const allowed = d => !harmony.penta || PENTA.has(((d % 7) + 7) % 7);
+  const strong = i => (st.steps === 12 ? i % 3 === 0 : stationKey === 'cumbia' ? i % 2 === 0 : i % 4 === 0);
+  const density = rnd(0.25, 0.55);
+  const makeMotif = (startDeg) => {
+    let d = startDeg; const m = Array(S).fill(null);
+    for (let i = 0; i < S; i++) {
+      if (R() < (strong(i) ? density + 0.25 : (stationKey === 'cumbia' ? density - 0.3 : density - 0.1))) {
+        let step = choose([-1, 1, -1, 1, 2, -2, 0, 3, -3]);
+        d = Math.max(-1, Math.min(10, d + step));
+        let tries = 0; while (!allowed(d) && tries++ < 4) d += step >= 0 ? 1 : -1;
+        m[i] = d;
+      }
+    }
+    return m;
+  };
+  const A = makeMotif(irnd(2, 6));
+  const B = chance(0.5) ? A.map(x => x == null ? null : x + choose([2, -2, 4])) : makeMotif(irnd(3, 8));
+  const vary = (m, p) => m.map((x, i) => (i > S / 2 && chance(p)) ? (x == null ? (chance(0.3) ? irnd(1, 8) : null) : (chance(0.5) ? null : x + choose([-1, 1]))) : x);
+  const phrase = [A, vary(A, 0.4), B, vary(A, 0.5)];
+  const silentBars = new Set(chance(0.5) ? [irnd(0, 7)] : []);
+  return cycle8(chords.map((_, b) => {
+    if (silentBars.has(b)) return '~';
+    let m = phrase[b % 4];
+    if (b >= 4) m = vary(m, 0.3);
+    if (b === SECTION - 1) { m = m.slice(); m[0] = 7; } // cierra en la tónica, una octava arriba
+    const thirds = stationKey === 'cumbia';
+    return bar(holdTokens(m.map(x => x == null ? null : thirds ? `[${deg(harmony, x)},${deg(harmony, x + 2)}]` : deg(harmony, x)), 3));
+  }));
+}
+
+function arpBars(st, chords) {
+  const S = st.steps;
+  const group = st.steps === 12 ? choose([2, 3]) : choose([3, 4]); // hemiola
+  const order = choose([[0,1,2], [0,2,1,2], [2,1,0], [0,1,2,1]]);
+  return cycle8(chords.map(d => {
+    const t = triad(harmony, d);
+    const toks = [];
+    for (let i = 0; i < S; i++) toks.push(i % group === 0 || chance(0.35) ? t[order[i % order.length]] + 12 : '~');
+    return bar(toks);
+  }));
+}
+
+// ---------- Armado de una sección ----------
+// Cada sección son 8 compases. Se arma adentro del scheduler de Strudel, en el momento en que
+// el reloj la pide: si la pestaña queda en segundo plano, la música sigue mutando igual.
+function buildSection(k) {
+  const st = STATIONS[stationKey];
+  const rel = k - stationStart;
+  R = mulberry((masterSeed ^ Math.imul(k + 1, 0x9E3779B1) ^ Math.imul(stationKey.length, 0x27d4eb2d)) >>> 0);
+  if (rel % MOVEMENT === 0 || !harmony) newMovement(st);
+  // energía: paseo aleatorio; el groove base nunca falta, la energía decide lo que se suma
+  const wasBreak = lastWasBreak;
+  energy = rel === 0 ? 0.45 : Math.max(0.1, Math.min(1, energy + rnd(-0.3, 0.32)));
+  const isBreak = rel > 2 && !wasBreak && energy < 0.22;
+  lastWasBreak = isBreak;
+  const chords = chordList();
+  const fillBar = SECTION - 1;
+  const layers = [], log = [];
+  const dt = 0.75 * 60 / harmony.bpm;
+  const sig = [], mark = (tag, str) => (sig.push(tag + '=' + str), str);
+
+  // colchón: siempre presente
+  let pad = note(mark('pad', padBars(chords))).s(timbre.pad).lpf(timbre.padLpf).room(0.35).orbit(1);
+  if (stationKey === 'milonga') pad = pad.struct(choose(['x x x x', 'x ~ x x', 'x x ~ x'])).decay(0.22).sustain(0.15).release(0.2).gain(0.3); // marcato en cuatro
+  else pad = pad.attack(stationKey === 'glaciar' ? 1.2 : 0.3).release(1.2).sustain(0.8).gain(timbre.pad === 'supersaw' ? 0.13 : (stationKey === 'cumbia' ? 0.12 : 0.2));
+  layers.push(pad);
+
+  // groove base: bajo + bombo + güira/shaker, desde el primer compás
+  layers.push(note(mark('bass', bassBars(st, chords))).s(timbre.bass).lpf(timbre.bassLpf).lpenv(2).lpdecay(0.12)
+    .decay(0.3).sustain(0.5).release(0.1).gain(0.45).orbit(1));
+  if (!isBreak) {
+    const kick = stationKey === 'glaciar' ? 'lt' : 'bd';
+    layers.push(s(mark('kick', drumBars(st, 'kick', fillBar))).s(kick).n(stationKey === 'glaciar' ? 0 : timbre.kickN)
+      .lpf(stationKey === 'glaciar' ? 900 : 8000).gain(stationKey === 'glaciar' ? 0.9 : 0.85).orbit(1));
+    log.push('bombo');
+  } else log.push('quiebre sin bombo');
+  const hg = hatGains(st);
+  layers.push(s('hh').struct(hg.replace(/[0-9.]+/g, 'x')).n(timbre.hatN)
+    .gain(hg.replace(/(\d\.\d+)/g, x => (x * 0.3).toFixed(2))).hpf(stationKey === 'cumbia' ? 3000 : 1500)
+    .pan(sine.range(0.35, 0.65).slow(5)).orbit(1));
+  log.push(stationKey === 'cumbia' ? 'güira' : 'chas');
+
+  if (energy > 0.35 && !isBreak) {
+    const sn = stationKey === 'glaciar' ? 'perc' : (stationKey === 'milonga' ? 'cp' : 'sd');
+    layers.push(s(drumBars(st, 'snare', fillBar)).s(sn).n(timbre.snareN).gain(0.42).room(0.2).orbit(1));
+    log.push(stationKey === 'cumbia' ? 'redoblante' : stationKey === 'milonga' ? 'palmas' : 'caja');
+  }
+  if (energy > 0.55) {
+    layers.push(s(drumBars(st, 'perc', -1)).s(stationKey === 'glaciar' ? 'click' : 'perc').n(timbre.percN).gain(0.22).pan(rand).orbit(1));
+  }
+  if (rel === 0 || energy > 0.3 || chance(0.4)) {
+    let lead = note(mark('lead', leadBars(st, chords))).s(timbre.lead).lpf(timbre.leadLpf).vib(timbre.vib).vibmod(timbre.vibmod)
+      .attack(stationKey === 'glaciar' ? 0.04 : 0.01).decay(0.2).sustain(0.6).release(0.15)
+      .gain(timbre.lead === 'sine' ? 0.32 : (stationKey === 'cumbia' ? 0.16 : 0.2)).delay(0.25).delaytime(dt).delayfeedback(0.35).room(0.3).orbit(2);
+    if (timbre.leadFm) lead = lead.fm(timbre.leadFm);
+    if (chance(st.glitch)) { lead = lead.sometimesBy(0.12, x => x.ply(2).crush(timbre.crushBits)); log.push('melodía fracturada'); }
+    else log.push(stationKey === 'cumbia' ? 'acordeón en terceras' : stationKey === 'milonga' ? 'bandoneón' : 'quena');
+    layers.push(lead);
+  }
+  if (energy > 0.55 && chance(0.6)) {
+    layers.push(note(arpBars(st, chords)).s(stationKey === 'glaciar' ? 'triangle' : 'square').lpf(2400).decay(0.09).sustain(0)
+      .gain(0.11).pan(sine.range(0.2, 0.8).slow(3)).orbit(1));
+    log.push(stationKey === 'glaciar' ? 'charango' : 'arpegio');
+  }
+  if (chance(st.glitch * (0.5 + energy))) {
+    layers.push(s('glitch*16').n(irnd(0, 7)).mask(binaryMask(st.steps)).gain(0.14).crush(timbre.crushBits).pan(rand).orbit(1));
+    log.push('glitch');
+  }
+  if (stationKey === 'glaciar' && chance(0.5)) {
+    layers.push(s('pink').attack(2).release(2).sustain(1).lpf(sine.range(400, 1600).slow(8)).gain(0.05).struct('x/2').orbit(1));
+    log.push('viento');
+  }
+
+  const info = { k, st: stationKey, energy, bpm: harmony.bpm, root: harmony.root, name: harmony.name, penta: harmony.penta,
+    log: `Compilando ciclo ${k * SECTION} · ` + log.join(', ') };
+  // huella de la sección, para comprobar que nada se repite
+  (window.__radioSections ||= []).push({ k, st: stationKey, layers: log.join(','), sig: sig.join('|') });
+  if (window.__radioSections.length > 300) window.__radioSections.shift();
+  return { pat: stack(...layers).cps(curCps), info };
+}
+
+function binaryMask(S) {
+  const toks = [];
+  for (let i = 0; i < 16; i++) toks.push(chance(0.18) ? 1 : 0);
+  return '<' + bar(toks) + ' ' + bar(toks.map(() => (chance(0.12) ? 1 : 0))) + '>';
+}
+
+// ---------- La radio como un único patrón infinito ----------
+const cache = new Map();
+let stationStart = 0, lastWasBreak = false, shownK = -1;
+function sectionAt(k) {
+  let sec = cache.get(k);
+  if (!sec) {
+    try { sec = buildSection(k); }
+    catch (e) { console.error('[radio] sección falló, repito la anterior', e); sec = cache.get(k - 1); if (!sec) throw e; }
+    cache.set(k, sec);
+    for (const key of cache.keys()) if (key < k - 2) cache.delete(key);
+  }
+  return sec;
+}
+let radio = null, precarga = null; // se crean cuando Strudel ya cargó
+
+// sonda para pruebas: arma n secciones de una estación sin tocar nada y devuelve sus huellas
+window.__radioProbe = async (key, n) => {
+  await strudelReady;
+  const saved = { stationKey, harmony, timbre, energy, curCps, stationStart, lastWasBreak };
+  stationKey = key; harmony = null; stationStart = 100000; lastWasBreak = false;
+  const out = [];
+  for (let k = stationStart; k < stationStart + n; k++) { const sec = buildSection(k); out.push({ cps: curCps, info: sec.info.log, sig: window.__radioSections.at(-1).sig }); }
+  ({ stationKey, harmony, timbre, energy, curCps, stationStart, lastWasBreak } = saved);
+  return out;
+};
+
+function startStation(key) {
+  stationKey = key;
+  harmony = null; lastWasBreak = false; cache.clear();
+  radio ||= new Pattern(state => sectionAt(Math.floor(state.span.begin.sam().valueOf() / SECTION)).pat.query(state)).splitQueries();
+  precarga ||= s('[bd sd cp lt hh perc click glitch]').gain(0.001).orbit(1);
+  const now = repl.scheduler.started ? repl.scheduler.now() : 0;
+  stationStart = Math.floor(now / SECTION);
+  repl.setPattern(stack(radio, precarga.filterWhen(t => t.valueOf() < now + 2)), true);
+  document.querySelectorAll('.dial button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.st === key)));
+  heatTarget = STATIONS[key].heat;
+  shownK = -1;
+}
+
+function updateHud() {
+  if (!playing) return;
+  const k = Math.floor(repl.scheduler.now() / SECTION);
+  if (k === shownK || !cache.has(k)) return;
+  shownK = k;
+  const i = cache.get(k).info, st = STATIONS[i.st];
+  const tone = `${NOTE_NAMES[i.root % 12]} ${i.name}${i.penta ? ' (pentatónica)' : ''}`;
+  const e = Math.round(i.energy * 8);
+  hud.innerHTML = `<b class="${st.heat > 0.5 ? 'warm' : 'cold'}">EN EL AIRE · ${st.label}</b><br>`
+    + `Semilla <b>${masterSeed.toString(16).toUpperCase().padStart(8, '0')}</b> · ${i.bpm} BPM · ${tone}<br>`
+    + `${i.log}<br>Energía ${'▮'.repeat(e)}${'▯'.repeat(8 - e)}`;
+}
+
+// ---------- Controles ----------
+const hud = document.getElementById('hud');
+const playBtn = document.getElementById('play');
+const stopBtn = document.getElementById('stop');
+let unlockEl = null;
+
+playBtn.addEventListener('click', async () => {
+  playBtn.textContent = 'Sintonizando…';
+  // iOS: un <audio> silencioso destraba el audio aunque el teléfono esté en modo silencio
+  try {
+    unlockEl = unlockEl || new Audio('data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABAAZGF0YQAAAAA=');
+    unlockEl.loop = true; unlockEl.play().catch(() => {});
+  } catch {}
+  repl = await strudelReady;
+  await getAudioContext().resume();
+  playing = true;
+  playBtn.hidden = true; stopBtn.hidden = false;
+  startStation(stationKey);
+});
+stopBtn.addEventListener('click', () => {
+  playing = false; hush();
+  playBtn.hidden = false; playBtn.textContent = '▶ Sintonizar'; stopBtn.hidden = true;
+  hud.textContent = 'Transmisión pausada. El búfer guarda el calor.';
+});
+document.querySelectorAll('.dial button').forEach(b => b.addEventListener('click', () => {
+  stationKey = b.dataset.st;
+  document.querySelectorAll('.dial button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+  heatTarget = STATIONS[stationKey].heat;
+  if (playing) startStation(stationKey);
+}));
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && playing) getAudioContext().resume();
+});
+
+// ---------- Visual ----------
+const cv = document.getElementById('cv');
+const g = cv.getContext('2d', { alpha: false });
+let W = 0, H = 0, DPR = 1;
+function resize() {
+  DPR = Math.min(window.devicePixelRatio || 1, 1.5);
+  const maxPx = 1.3e6; // tope de píxeles para celulares
+  let w = innerWidth * DPR, h = innerHeight * DPR;
+  const k = Math.min(1, Math.sqrt(maxPx / (w * h)));
+  W = cv.width = Math.round(w * k); H = cv.height = Math.round(h * k);
+  g.fillStyle = '#04080d'; g.fillRect(0, 0, W, H);
+}
+addEventListener('resize', resize); resize();
+
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+let heatTarget = STATIONS[stationKey].heat, heat = heatTarget;
+let freq = new Uint8Array(512), waveF = new Float32Array(1024);
+let bassAvg = 0, glitchFrames = 0, t0 = performance.now();
+const stats = { peak: 0, clips: 0, silentFor: 0, frames: 0, fps: 0 };
+window.__radioStats = stats;
+const dead = Array.from({ length: 9 }, () => ({ x: Math.random(), y: Math.random(), life: 0 }));
+let lastT = performance.now(), fpsAcc = 0, fpsN = 0;
+
+function mix(a, b, t) { return a.map((v, i) => Math.round(v + (b[i] - v) * t)); }
+const ICE = [92, 225, 255], AMBER = [255, 179, 71];
+
+function hexPath(cx, cy, r, rot) {
+  g.beginPath();
+  for (let i = 0; i < 6; i++) { const a = rot + i * Math.PI / 3; const x = cx + r * Math.cos(a), y = cy + r * Math.sin(a); i ? g.lineTo(x, y) : g.moveTo(x, y); }
+  g.closePath();
+}
+
+function frame(now) {
+  requestAnimationFrame(frame);
+  const dtms = now - lastT; lastT = now; fpsAcc += dtms; fpsN++;
+  if (fpsAcc > 1000) { stats.fps = Math.round(fpsN * 1000 / fpsAcc); fpsAcc = 0; fpsN = 0; }
+  stats.frames++;
+  const m = window.__radioMaster;
+  let bass = 0, mid = 0, high = 0, rms = 0;
+  if (m && playing) {
+    m.analyser.getByteFrequencyData(freq);
+    m.analyser.getFloatTimeDomainData(waveF);
+    for (let i = 1; i < 8; i++) bass += freq[i]; bass /= 7 * 255;
+    for (let i = 8; i < 60; i++) mid += freq[i]; mid /= 52 * 255;
+    for (let i = 60; i < 200; i++) high += freq[i]; high /= 140 * 255;
+    let pk = 0;
+    for (let i = 0; i < waveF.length; i++) { const a = Math.abs(waveF[i]); rms += a * a; if (a > pk) pk = a; if (a >= 0.999) stats.clips++; }
+    rms = Math.sqrt(rms / waveF.length);
+    stats.peak = Math.max(stats.peak, pk);
+    // vigía de silencio: si el aire queda muerto, se vuelve a sintonizar
+    if (rms < 0.002) {
+      stats.silentFor += dtms / 1000;
+      if (stats.silentFor > 3 && stats.silentFor - dtms / 1000 <= 3) getAudioContext().resume();
+      if (stats.silentFor > 10) { stats.silentFor = 0; stats.restarts = (stats.restarts || 0) + 1; try { startStation(stationKey); } catch {} }
+    } else stats.silentFor = 0;
+    stats.maxSilent = Math.max(stats.maxSilent || 0, stats.silentFor);
+  }
+  heat += (heatTarget - heat) * 0.02;
+  if (playing && repl) updateHud();
+  const t = (now - t0) / 1000;
+  const cx = W / 2, cy = H * 0.5, base = Math.min(W, H) * 0.17;
+
+  // estela
+  g.globalCompositeOperation = 'source-over';
+  g.fillStyle = `rgba(4,8,13,${0.22 + 0.1 * (1 - bass)})`;
+  g.fillRect(0, 0, W, H);
+
+  g.globalCompositeOperation = 'lighter';
+  const col = mix(ICE, AMBER, heat * 0.6 + bass * 0.3);
+  // espectro radial alrededor del cristal
+  const N = 54;
+  g.lineWidth = Math.max(1.5, base * 0.035);
+  g.lineCap = 'round';
+  for (let i = 0; i < N; i++) {
+    const v = playing ? freq[2 + Math.floor((i < N / 2 ? i : N - i) * 3.2)] / 255 : 0.05 + 0.04 * Math.sin(t * 2 + i);
+    const a = (i / N) * Math.PI * 2 + t * 0.05;
+    const r0 = base * 1.25, r1 = r0 + v * base * 1.4;
+    const c = i % 9 === 0 ? AMBER : mix(ICE, AMBER, v * heat);
+    g.strokeStyle = `rgba(${c[0]},${c[1]},${c[2]},${0.25 + v * 0.7})`;
+    g.beginPath(); g.moveTo(cx + Math.cos(a) * r0, cy + Math.sin(a) * r0); g.lineTo(cx + Math.cos(a) * r1, cy + Math.sin(a) * r1); g.stroke();
+  }
+  // cristal hexagonal: late con el bombo
+  const r = base * (0.85 + bass * 0.35);
+  const rot = Math.PI / 6 + t * 0.07 + mid * 0.2;
+  const split = (glitchFrames > 0 ? base * 0.06 : 0) + high * base * 0.03;
+  g.lineWidth = Math.max(2, base * 0.05);
+  g.strokeStyle = 'rgba(255,90,110,.35)'; hexPath(cx - split, cy, r, rot); g.stroke();
+  g.strokeStyle = `rgba(${col[0]},${col[1]},${col[2]},.9)`; hexPath(cx, cy, r, rot); g.stroke();
+  g.strokeStyle = 'rgba(92,225,255,.35)'; hexPath(cx + split, cy, r, rot); g.stroke();
+  g.lineWidth = Math.max(1, base * 0.015);
+  g.strokeStyle = `rgba(255,179,71,${0.25 + heat * 0.5})`; hexPath(cx, cy, r * 0.62, -rot * 0.7); g.stroke();
+  g.fillStyle = `rgba(${col[0]},${col[1]},${col[2]},${0.05 + bass * 0.18})`; hexPath(cx, cy, r * 0.62, -rot * 0.7); g.fill();
+
+  // osciloscopio
+  if (playing) {
+    g.strokeStyle = `rgba(92,225,255,${0.35 + mid * 0.5})`;
+    g.lineWidth = Math.max(1, DPR);
+    g.beginPath();
+    const y0 = H * 0.82, amp = H * 0.09;
+    for (let i = 0; i < waveF.length; i += 4) { const x = (i / waveF.length) * W, y = y0 + waveF[i] * amp * 2.2; i ? g.lineTo(x, y) : g.moveTo(x, y); }
+    g.stroke();
+  }
+
+  // píxeles muertos de la Ruta 404 (Luz Mala): ámbar, aparecen con el calor
+  g.globalCompositeOperation = 'source-over';
+  const px = Math.max(3, Math.round(base * 0.04));
+  for (const d of dead) {
+    if (d.life <= 0 && Math.random() < 0.004 + heat * 0.01 + high * 0.02) { d.x = Math.random(); d.y = Math.random(); d.life = 20 + Math.random() * 60; }
+    if (d.life > 0) { d.life--; if (Math.random() > 0.2) { g.fillStyle = Math.random() < 0.8 ? '#ffb347' : '#5ce1ff'; g.fillRect(Math.floor(d.x * W / px) * px, Math.floor(d.y * H / px) * px, px, px); } }
+  }
+
+  // glitch: en golpes fuertes, rebanadas horizontales desplazadas
+  bassAvg = bassAvg * 0.93 + bass * 0.07;
+  if (!reduce && playing && bass > bassAvg * 1.35 + 0.08 && Math.random() < 0.35 + STATIONS[stationKey].glitch) glitchFrames = 3 + Math.floor(Math.random() * 4);
+  if (glitchFrames > 0) {
+    glitchFrames--;
+    const slices = 2 + Math.floor(Math.random() * 4);
+    for (let i = 0; i < slices; i++) {
+      const sh = Math.max(2, Math.floor(Math.random() * H * 0.05)), sy = Math.floor(Math.random() * (H - sh));
+      const off = Math.floor((Math.random() - 0.5) * W * 0.08);
+      g.drawImage(cv, 0, sy, W, sh, off, sy, W, sh);
+    }
+  }
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
