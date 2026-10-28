@@ -225,7 +225,8 @@ function newMovement(st) {
   timbre = {
     lead: choose(st === STATIONS.glaciar ? ['sine', 'triangle', 'triangle'] : ['square', 'sawtooth', 'triangle', 'square']),
     leadLpf: irnd(1400, 4200), leadFm: chance(0.35) ? rnd(0.5, 2.5) : 0, vib: rnd(3.5, 6.5), vibmod: rnd(0.05, 0.25),
-    pad: choose(st === STATIONS.milonga ? ['supersaw', 'sawtooth'] : st === STATIONS.glaciar ? ['triangle', 'sine', 'supersaw'] : ['sawtooth', 'square', 'triangle']),
+    // sin supersaw: son varios osciladores por nota y en una PC vieja traban todo
+    pad: choose(st === STATIONS.milonga ? ['sawtooth', 'square'] : st === STATIONS.glaciar ? ['triangle', 'sine'] : ['sawtooth', 'square', 'triangle']),
     padLpf: irnd(500, 1600),
     bass: choose(['sawtooth', 'square', 'sine', 'triangle']), bassLpf: irnd(280, 900),
     kickN: irnd(0, 8), snareN: irnd(0, 10), hatN: irnd(0, 8), percN: irnd(0, 6),
@@ -395,7 +396,7 @@ function buildSection(k) {
   // colchón: siempre presente
   let pad = note(mark('pad', padBars(chords))).s(timbre.pad).lpf(timbre.padLpf).room(0.35).orbit(1);
   if (stationKey === 'milonga') pad = pad.struct(choose(['x x x x', 'x ~ x x', 'x x ~ x'])).decay(0.22).sustain(0.15).release(0.2).gain(0.3); // marcato en cuatro
-  else pad = pad.attack(stationKey === 'glaciar' ? 1.2 : 0.3).release(1.2).sustain(0.8).gain(timbre.pad === 'supersaw' ? 0.13 : (stationKey === 'cumbia' ? 0.12 : 0.2));
+  else pad = pad.attack(stationKey === 'glaciar' ? 1.2 : 0.3).release(1.2).sustain(0.8).gain(stationKey === 'cumbia' ? 0.12 : 0.2);
   layers.push(pad);
 
   // groove base: bajo + bombo + güira/shaker, desde el primer compás
@@ -409,8 +410,7 @@ function buildSection(k) {
   } else log.push('quiebre sin bombo');
   const hg = hatGains(st);
   layers.push(s('hh').struct(hg.replace(/[0-9.]+/g, 'x')).n(timbre.hatN)
-    .gain(hg.replace(/(\d\.\d+)/g, x => (x * 0.3).toFixed(2))).hpf(stationKey === 'cumbia' ? 3000 : 1500)
-    .pan(sine.range(0.35, 0.65).slow(5)).orbit(1));
+    .gain(hg.replace(/(\d\.\d+)/g, x => (x * 0.3).toFixed(2))).hpf(stationKey === 'cumbia' ? 3000 : 1500).orbit(1));
   log.push(stationKey === 'cumbia' ? 'güira' : 'chas');
 
   if (energy > 0.35 && !isBreak) {
@@ -419,7 +419,7 @@ function buildSection(k) {
     log.push(stationKey === 'cumbia' ? 'redoblante' : stationKey === 'milonga' ? 'palmas' : 'caja');
   }
   if (energy > 0.55) {
-    layers.push(s(drumBars(st, 'perc', -1)).s(stationKey === 'glaciar' ? 'click' : 'perc').n(timbre.percN).gain(0.22).pan(rand).orbit(1));
+    layers.push(s(drumBars(st, 'perc', -1)).s(stationKey === 'glaciar' ? 'click' : 'perc').n(timbre.percN).gain(0.22).orbit(1));
   }
   if (rel === 0 || energy > 0.3 || chance(0.4)) {
     let lead = note(mark('lead', leadBars(st, chords))).s(timbre.lead).lpf(timbre.leadLpf).vib(timbre.vib).vibmod(timbre.vibmod)
@@ -510,6 +510,30 @@ function updateHud() {
     + `${i.log}<br>Energía ${'▮'.repeat(e)}${'▯'.repeat(8 - e)}`;
 }
 
+// Strudel prepara solo 0,2 s por adelantado y saltea lo que llega tarde: en una PC lenta,
+// cualquier tirón corta la música. Mismo reloj que el suyo, pero con medio segundo de margen.
+function alargarReloj(sch) {
+  if (sch.__largo || typeof createClock !== 'function' || typeof getTriggerFunc !== 'function') return;
+  const onTrigger = getTriggerFunc(), latencia = 0.1;
+  sch.clock?.stop?.();
+  sch.clock = createClock(sch.getTime, (d, dur, _, ahora) => {
+    if (sch.num_ticks_since_cps_change === 0) { sch.num_cycles_at_cps_change = sch.lastEnd; sch.seconds_at_cps_change = d; }
+    sch.num_ticks_since_cps_change++;
+    try {
+      const desde = sch.lastEnd, hasta = sch.num_cycles_at_cps_change + sch.num_ticks_since_cps_change * dur * sch.cps;
+      sch.lastBegin = desde; sch.lastEnd = hasta; sch.lastTick = d;
+      if (d < ahora) return;
+      sch.pattern.queryArc(desde, hasta, { _cps: sch.cps, cyclist: 'cyclist' }).forEach(ev => {
+        if (!ev.hasOnset()) return;
+        const t = (ev.whole.begin - sch.num_cycles_at_cps_change) / sch.cps + sch.seconds_at_cps_change + latencia;
+        onTrigger?.(ev, t - d, ev.duration / sch.cps, sch.cps, t);
+        if (ev.value.cps !== undefined && sch.cps != ev.value.cps) { sch.cps = ev.value.cps; sch.num_ticks_since_cps_change = 0; }
+      });
+    } catch (e) { console.error('[radio] reloj', e); }
+  }, 0.05, 0.1, 0.4);
+  sch.__largo = true;
+}
+
 // ---------- Controles ----------
 const hud = document.getElementById('hud');
 const playBtn = document.getElementById('play');
@@ -518,12 +542,14 @@ let unlockEl = null;
 
 playBtn.addEventListener('click', async () => {
   playBtn.textContent = 'Sintonizando…';
-  // iOS: un <audio> silencioso destraba el audio aunque el teléfono esté en modo silencio
+  // iOS: que suene aunque el teléfono esté en modo silencio. Antes era un <audio> vacío en loop,
+  // pero un archivo de cero muestras en loop deja al navegador girando y se comía media PC.
   try {
-    unlockEl = unlockEl || new Audio('data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABAAZGF0YQAAAAA=');
-    unlockEl.loop = true; unlockEl.play().catch(() => {});
+    if (navigator.audioSession) navigator.audioSession.type = 'playback';
+    else { unlockEl = unlockEl || new Audio('data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABAAZGF0YQAAAAA='); unlockEl.play().catch(() => {}); }
   } catch {}
   repl = await strudelReady;
+  if (!repl.scheduler.started) alargarReloj(repl.scheduler);
   await getAudioContext().resume();
   playing = true;
   playBtn.hidden = true; stopBtn.hidden = false;
@@ -593,6 +619,7 @@ function hexPath(cx, cy, r, rot) {
 
 function frame(now) {
   requestAnimationFrame(frame);
+  if (now - lastT < 31) return; // 30 cuadros por segundo alcanzan y liberan la máquina para el audio
   const dtms = now - lastT; lastT = now; fpsAcc += dtms; fpsN++;
   if (fpsAcc > 1000) { stats.fps = Math.round(fpsN * 1000 / fpsAcc); fpsAcc = 0; fpsN = 0; }
   stats.frames++;
