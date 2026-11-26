@@ -10,9 +10,27 @@
 <meta property="og:description" content="Música generativa infinita del Universo Austral: cumbia glitch, milonga cyberpunk y folklore electrónico. Nunca suena igual dos veces.">
 <meta property="og:url" content="https://kvothesson.com/radio/">
 <meta property="og:locale" content="es_AR">
+<meta property="og:site_name" content="Kvothesson">
+<meta name="twitter:card" content="summary">
 <meta name="theme-color" content="#04080d">
-<title>Radio Austral</title>
-<meta name="description" content="Música generativa infinita del Universo Austral: cumbia glitch, milonga cyberpunk y folklore electrónico, hecha con Strudel en tu navegador. Nunca suena igual dos veces.">
+<title>Radio Austral · Música generativa infinita en tu navegador</title>
+<meta name="description" content="Radio gratis de música generativa infinita: cumbia glitch, milonga cyberpunk y folklore electrónico compuestos en vivo en tu navegador. Nunca suena igual.">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "Radio Austral",
+  "description": "Radio de música generativa infinita del Universo Austral, compuesta en vivo en el navegador con Strudel. Tiene tres estaciones: FM Calor 404 (cumbia glitch), Neo-BA 2074 (milonga cyberpunk) y Glaciar (folklore electrónico). No pasa canciones grabadas: cada 8 compases arma la sección siguiente con una semilla propia, así que nunca suena igual dos veces.",
+  "url": "https://kvothesson.com/radio/",
+  "inLanguage": "es",
+  "isAccessibleForFree": true,
+  "applicationCategory": "MultimediaApplication",
+  "operatingSystem": "Web",
+  "genre": ["Cumbia", "Milonga", "Folklore electrónico", "Música generativa"],
+  "license": "https://www.gnu.org/licenses/agpl-3.0.html",
+  "author": {"@type": "Organization", "name": "Kvothesson", "url": "https://kvothesson.com/"}
+}
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=JetBrains+Mono:wght@400;600&display=swap">
@@ -111,7 +129,11 @@ a { color: var(--muted); }
   <header>
     <h1>RADIO AUSTRAL<span class="envivo">EN VIVO</span></h1>
     <p>El frío computa, el calor recuerda. Transmisión generativa, nunca suena igual dos veces.</p>
-    <div class="hud" id="hud" aria-live="polite">Señal en espera. Tocá sintonizar.</div>
+    <div class="hud" id="hud" aria-live="polite">Señal en espera. Tocá sintonizar: es una radio gratis que compone música sin parar en tu navegador, sin canciones grabadas.</div>
+    <noscript>
+      <p>Radio Austral es una radio gratis de música generativa infinita. No pasa canciones grabadas: la música se compone en vivo en tu navegador con Strudel, así que nunca suena igual dos veces. Cada 8 compases arma la sección siguiente con una semilla propia, y cada cuatro secciones cambian la tonalidad, el tempo y los timbres.</p>
+      <p>Tiene tres estaciones: FM Calor 404, cumbia glitch con güira, bombo y acordeón; Neo-BA 2074, milonga cyberpunk con bandoneón sintético; y Glaciar, folklore electrónico en 6/8 con bombo legüero, quena y charango. Se usa con un botón: tocás Sintonizar, elegís estación en el dial y la dejás sonando. Para escucharla hace falta activar JavaScript. Es un proyecto de <a href="https://kvothesson.com/">Kvothesson</a>.</p>
+    </noscript>
   </header>
   <div class="center"><button id="play" type="button">▶ Sintonizar</button></div>
   <footer>
